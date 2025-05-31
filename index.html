@@ -1,30 +1,64 @@
-
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FloodLight - Flood Monitoring & Emergency Response</title>
-    <meta name="description" content="Advanced flood monitoring and disaster response system for emergency managers and communities" />
-    <meta name="author" content="FloodLight" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>FloodLight: Guardian View</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta property="og:title" content="FloodLight - Flood Monitoring System" />
-    <meta property="og:description" content="We're watching the waters for you - Advanced flood monitoring and emergency response" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@floodlight" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-  </head>
+  <!-- Styles -->
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { height: 100vh; width: 100vw; }
+    .panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 999;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
 
-  <body>
-    <div id="root"></div>
-    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    .panel h2 {
+      margin: 0 0 5px 0;
+    }
+    .panel p {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel">
+    <h2>🌊 FloodLight: Guardian View</h2>
+    <p>Live flood & rain monitoring (beta)</p>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Initialize the map centered on New York City
+    const map = L.map('map').setView([40.7128, -74.0060], 10);
+
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Example marker: flood alert
+    const alertMarker = L.marker([40.730610, -73.935242]).addTo(map)
+      .bindPopup('<b>🚨 High Water Alert</b><br>Detected Flood Risk!')
+      .openPopup();
+  </script>
+
+</body>
 </html>
