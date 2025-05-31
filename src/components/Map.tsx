@@ -1,7 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,16 +25,29 @@ interface MapClickData {
 
 export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const map = useRef<any>(null);
   const [clickData, setClickData] = useState<MapClickData | null>(null);
   const [timelineValue, setTimelineValue] = useState(12);
   const [mapboxToken, setMapboxToken] = useState('');
   const [mapInitialized, setMapInitialized] = useState(false);
   const [tokenError, setTokenError] = useState(false);
+  const [mapboxgl, setMapboxgl] = useState<any>(null);
 
-  // Initialize map when token is provided
+  // Dynamically import mapbox-gl when needed
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken || mapInitialized) return;
+    if (mapboxToken && !mapboxgl) {
+      import('mapbox-gl').then((mapbox) => {
+        setMapboxgl(mapbox.default);
+      }).catch((error) => {
+        console.error('Failed to load Mapbox GL:', error);
+        setTokenError(true);
+      });
+    }
+  }, [mapboxToken]);
+
+  // Initialize map when token and mapbox are available
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken || !mapboxgl || mapInitialized) return;
 
     try {
       mapboxgl.accessToken = mapboxToken;
@@ -162,7 +173,7 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
       });
 
       // Handle map clicks
-      map.current.on('click', (e) => {
+      map.current.on('click', (e: any) => {
         const { lng, lat } = e.lngLat;
         
         const mockData: MapClickData = {
@@ -188,7 +199,7 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
       map.current?.remove();
       setMapInitialized(false);
     };
-  }, [mapboxToken]);
+  }, [mapboxToken, mapboxgl]);
 
   // Update layer visibility based on selectedLayer
   useEffect(() => {
@@ -214,7 +225,16 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
     }
   };
 
-  if (!mapboxToken) {
+  const handleInitializeMap = () => {
+    if (mapboxToken.startsWith('pk.')) {
+      // Token looks valid, let the effect handle initialization
+      setTokenError(false);
+    } else {
+      setTokenError(true);
+    }
+  };
+
+  if (!mapboxToken || !mapInitialized) {
     return (
       <div className="relative w-full h-full bg-gradient-to-br from-blue-100 via-blue-50 to-green-100 min-h-[600px] flex items-center justify-center">
         <Card className="w-96 p-6 bg-white/95 backdrop-blur-sm shadow-xl">
@@ -242,7 +262,7 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
               )}
             </div>
             <Button 
-              onClick={() => setMapboxToken(mapboxToken)}
+              onClick={handleInitializeMap}
               className="w-full"
               disabled={!mapboxToken.startsWith('pk.')}
             >
