@@ -25,197 +25,10 @@ interface MapClickData {
 
 export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<any>(null);
   const [clickData, setClickData] = useState<MapClickData | null>(null);
   const [timelineValue, setTimelineValue] = useState(12);
   const [mapboxToken, setMapboxToken] = useState('');
-  const [mapInitialized, setMapInitialized] = useState(false);
   const [tokenError, setTokenError] = useState(false);
-  const [mapboxgl, setMapboxgl] = useState<any>(null);
-
-  // Dynamically import mapbox-gl when needed
-  useEffect(() => {
-    if (mapboxToken && !mapboxgl) {
-      import('mapbox-gl').then((mapbox) => {
-        setMapboxgl(mapbox.default);
-      }).catch((error) => {
-        console.error('Failed to load Mapbox GL:', error);
-        setTokenError(true);
-      });
-    }
-  }, [mapboxToken]);
-
-  // Initialize map when token and mapbox are available
-  useEffect(() => {
-    if (!mapContainer.current || !mapboxToken || !mapboxgl || mapInitialized) return;
-
-    try {
-      mapboxgl.accessToken = mapboxToken;
-      
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/light-v11',
-        center: [-95.3698, 29.7604], // Houston, TX (flood-prone area)
-        zoom: 10,
-        pitch: 0,
-      });
-
-      // Add navigation controls
-      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-      map.current.on('load', () => {
-        if (!map.current) return;
-
-        // Add flood zones layer
-        map.current.addSource('flood-zones', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: [
-                    [
-                      [-95.4, 29.8],
-                      [-95.3, 29.8],
-                      [-95.3, 29.7],
-                      [-95.4, 29.7],
-                      [-95.4, 29.8]
-                    ]
-                  ]
-                },
-                properties: { risk: 'high', name: 'Zone 1' }
-              },
-              {
-                type: 'Feature',
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: [
-                    [
-                      [-95.35, 29.75],
-                      [-95.25, 29.75],
-                      [-95.25, 29.65],
-                      [-95.35, 29.65],
-                      [-95.35, 29.75]
-                    ]
-                  ]
-                },
-                properties: { risk: 'medium', name: 'Zone 2' }
-              }
-            ]
-          }
-        });
-
-        map.current.addLayer({
-          id: 'flood-zones-fill',
-          type: 'fill',
-          source: 'flood-zones',
-          paint: {
-            'fill-color': [
-              'match',
-              ['get', 'risk'],
-              'high', '#ef4444',
-              'medium', '#f59e0b',
-              'low', '#22c55e',
-              '#3b82f6'
-            ],
-            'fill-opacity': 0.4
-          }
-        });
-
-        // Add sensors
-        map.current.addSource('sensors', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: [-95.37, 29.76] },
-                properties: { status: 'normal', id: 1 }
-              },
-              {
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: [-95.33, 29.74] },
-                properties: { status: 'warning', id: 2 }
-              },
-              {
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: [-95.35, 29.72] },
-                properties: { status: 'alert', id: 3 }
-              }
-            ]
-          }
-        });
-
-        map.current.addLayer({
-          id: 'sensors',
-          type: 'circle',
-          source: 'sensors',
-          paint: {
-            'circle-color': [
-              'match',
-              ['get', 'status'],
-              'normal', '#22c55e',
-              'warning', '#f59e0b',
-              'alert', '#ef4444',
-              '#3b82f6'
-            ],
-            'circle-radius': 8,
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff'
-          }
-        });
-
-        setMapInitialized(true);
-      });
-
-      // Handle map clicks
-      map.current.on('click', (e: any) => {
-        const { lng, lat } = e.lngLat;
-        
-        const mockData: MapClickData = {
-          x: e.point.x,
-          y: e.point.y,
-          coordinates: [lng, lat],
-          zone: `Zone ${Math.floor(Math.random() * 5) + 1}`,
-          waterLevel: Math.floor(Math.random() * 100),
-          riskLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as 'Low' | 'Medium' | 'High',
-          resources: ['Emergency Shelter (2.3km)', 'Fire Station (1.8km)', 'Hospital (4.5km)']
-        };
-        
-        setClickData(mockData);
-      });
-
-      setTokenError(false);
-    } catch (error) {
-      console.error('Mapbox initialization error:', error);
-      setTokenError(true);
-    }
-
-    return () => {
-      map.current?.remove();
-      setMapInitialized(false);
-    };
-  }, [mapboxToken, mapboxgl]);
-
-  // Update layer visibility based on selectedLayer
-  useEffect(() => {
-    if (!map.current || !mapInitialized) return;
-
-    const layerVisibility = {
-      'flood-zones-fill': selectedLayer === 'flood-zones',
-      'sensors': selectedLayer === 'sensors' || selectedLayer === 'flood-zones'
-    };
-
-    Object.entries(layerVisibility).forEach(([layerId, visible]) => {
-      if (map.current?.getLayer(layerId)) {
-        map.current.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
-      }
-    });
-  }, [selectedLayer, mapInitialized]);
 
   const getRiskColor = (level: string) => {
     switch (level) {
@@ -227,14 +40,34 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
 
   const handleInitializeMap = () => {
     if (mapboxToken.startsWith('pk.')) {
-      // Token looks valid, let the effect handle initialization
       setTokenError(false);
+      // Here you would normally initialize the real Mapbox map
+      console.log('Mapbox token provided:', mapboxToken);
     } else {
       setTokenError(true);
     }
   };
 
-  if (!mapboxToken || !mapInitialized) {
+  // Mock map click handler for demonstration
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const mockData: MapClickData = {
+      x,
+      y,
+      coordinates: [-95.3698 + (Math.random() - 0.5) * 0.1, 29.7604 + (Math.random() - 0.5) * 0.1],
+      zone: `Zone ${Math.floor(Math.random() * 5) + 1}`,
+      waterLevel: Math.floor(Math.random() * 100),
+      riskLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as 'Low' | 'Medium' | 'High',
+      resources: ['Emergency Shelter (2.3km)', 'Fire Station (1.8km)', 'Hospital (4.5km)']
+    };
+    
+    setClickData(mockData);
+  };
+
+  if (!mapboxToken) {
     return (
       <div className="relative w-full h-full bg-gradient-to-br from-blue-100 via-blue-50 to-green-100 min-h-[600px] flex items-center justify-center">
         <Card className="w-96 p-6 bg-white/95 backdrop-blur-sm shadow-xl">
@@ -276,8 +109,31 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
 
   return (
     <div className="relative w-full h-full min-h-[600px]">
-      {/* Map Container */}
-      <div ref={mapContainer} className="absolute inset-0" />
+      {/* Mock Map Container */}
+      <div 
+        ref={mapContainer} 
+        className="absolute inset-0 bg-gradient-to-br from-green-100 to-blue-100 cursor-pointer"
+        onClick={handleMapClick}
+      >
+        {/* Mock map content */}
+        <div className="absolute inset-0 opacity-30">
+          <svg className="w-full h-full" viewBox="0 0 800 600">
+            {/* Mock flood zones */}
+            <rect x="100" y="100" width="200" height="150" fill="#ef4444" opacity="0.4" />
+            <rect x="400" y="200" width="180" height="120" fill="#f59e0b" opacity="0.4" />
+            
+            {/* Mock sensors */}
+            <circle cx="200" cy="180" r="8" fill="#22c55e" stroke="#ffffff" strokeWidth="2" />
+            <circle cx="480" cy="260" r="8" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" />
+            <circle cx="350" cy="300" r="8" fill="#ef4444" stroke="#ffffff" strokeWidth="2" />
+          </svg>
+        </div>
+        
+        {/* Map attribution */}
+        <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
+          Mock Map - Token: {mapboxToken.substring(0, 10)}...
+        </div>
+      </div>
 
       {/* Map Overlay Indicators */}
       <div className="absolute top-4 left-4 space-y-2 z-10">
