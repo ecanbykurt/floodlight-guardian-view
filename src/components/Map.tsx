@@ -51,51 +51,73 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
   };
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-blue-100 to-green-100">
-      {/* Map Container */}
+    <div className="relative w-full h-full bg-gradient-to-br from-blue-100 via-blue-50 to-green-100 min-h-[600px]">
+      {/* Map Container with visible grid and geographic features */}
       <div 
-        className="absolute inset-0 cursor-crosshair"
+        className="absolute inset-0 cursor-crosshair bg-cover bg-center"
         onClick={handleMapClick}
         style={{
           backgroundImage: `
-            radial-gradient(circle at 30% 40%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 70% 60%, rgba(34, 197, 94, 0.2) 0%, transparent 50%),
-            radial-gradient(circle at 50% 80%, rgba(239, 68, 68, 0.4) 0%, transparent 30%)
-          `
+            linear-gradient(45deg, rgba(59, 130, 246, 0.1) 25%, transparent 25%), 
+            linear-gradient(-45deg, rgba(59, 130, 246, 0.1) 25%, transparent 25%), 
+            linear-gradient(45deg, transparent 75%, rgba(34, 197, 94, 0.1) 75%), 
+            linear-gradient(-45deg, transparent 75%, rgba(34, 197, 94, 0.1) 75%),
+            radial-gradient(circle at 30% 40%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
+            radial-gradient(circle at 70% 60%, rgba(34, 197, 94, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 50% 80%, rgba(239, 68, 68, 0.5) 0%, transparent 30%)
+          `,
+          backgroundSize: '20px 20px, 20px 20px, 20px 20px, 20px 20px, 200px 200px, 200px 200px, 150px 150px'
         }}
       >
+        {/* Map Grid Overlay */}
+        <div className="absolute inset-0 opacity-20">
+          <svg width="100%" height="100%" className="absolute inset-0">
+            <defs>
+              <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#3B82F6" strokeWidth="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
+        </div>
+
         {/* Map Overlay Indicators */}
-        <div className="absolute top-4 left-4 space-y-2">
+        <div className="absolute top-4 left-4 space-y-2 z-10">
           {selectedLayer === 'flood-zones' && (
-            <Badge className="bg-blue-500/80 text-white">Flood Zones Active</Badge>
+            <Badge className="bg-blue-500/90 text-white shadow-lg">📍 Flood Zones Active</Badge>
           )}
           {selectedLayer === 'rain-intensity' && (
-            <Badge className="bg-green-500/80 text-white">Rain Intensity Active</Badge>
+            <Badge className="bg-green-500/90 text-white shadow-lg">🌧️ Rain Intensity Active</Badge>
           )}
           {selectedLayer === 'sensors' && (
-            <Badge className="bg-purple-500/80 text-white">Sensors Active</Badge>
+            <Badge className="bg-purple-500/90 text-white shadow-lg">📡 Sensors Active</Badge>
           )}
         </div>
 
+        {/* Mock Geographic Features */}
+        <div className="absolute top-1/4 left-1/6 w-32 h-2 bg-blue-400 rounded-full opacity-60" title="River" />
+        <div className="absolute top-1/3 right-1/4 w-24 h-24 bg-green-300 rounded-full opacity-40" title="Park Area" />
+        <div className="absolute bottom-1/3 left-1/3 w-40 h-4 bg-gray-400 rounded opacity-50" title="Highway" />
+
         {/* Mock Sensor Points */}
-        <div className="absolute top-1/3 left-1/4 w-3 h-3 bg-green-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg" />
-        <div className="absolute top-1/2 right-1/3 w-3 h-3 bg-yellow-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg" />
-        <div className="absolute bottom-1/3 left-1/2 w-3 h-3 bg-red-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg" />
+        <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-green-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold" title="Sensor: Normal">✓</div>
+        <div className="absolute top-1/2 right-1/3 w-4 h-4 bg-yellow-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold" title="Sensor: Warning">⚠</div>
+        <div className="absolute bottom-1/3 left-1/2 w-4 h-4 bg-red-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold" title="Sensor: Alert">!</div>
 
         {/* Mock Community Reports */}
-        <div className="absolute top-2/3 left-1/3 cursor-pointer">
+        <div className="absolute top-2/3 left-1/3 cursor-pointer" title="Community Report">
           <div className="relative">
             <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm border-2 border-white shadow-lg">
               📍
             </div>
-            <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs">!</Badge>
+            <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs animate-bounce">!</Badge>
           </div>
         </div>
 
         {/* Mock Drone Feed Indicator */}
-        <div className="absolute top-1/4 right-1/4 cursor-pointer">
-          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white border-2 border-white shadow-lg">
-            <Camera className="w-5 h-5" />
+        <div className="absolute top-1/4 right-1/4 cursor-pointer" title="Drone Feed">
+          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white border-2 border-white shadow-lg hover:bg-blue-700 transition-colors">
+            <Camera className="w-6 h-6" />
           </div>
         </div>
       </div>
@@ -103,9 +125,9 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
       {/* Zone Details Popup */}
       {clickData && (
         <Card 
-          className="absolute z-50 w-80 p-4 bg-white/95 backdrop-blur-sm shadow-lg border"
+          className="absolute z-50 w-80 p-4 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200"
           style={{ 
-            left: Math.min(clickData.x, window.innerWidth - 350), 
+            left: Math.min(clickData.x, (typeof window !== 'undefined' ? window.innerWidth : 800) - 350), 
             top: Math.max(clickData.y - 100, 20) 
           }}
         >
