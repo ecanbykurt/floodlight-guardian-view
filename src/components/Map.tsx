@@ -1,10 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { X, MapPin, Camera, AlertTriangle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { X, MapPin, Camera, AlertTriangle, Key } from 'lucide-react';
 
 interface MapProps {
   selectedLayer: string;
@@ -18,29 +22,189 @@ interface MapClickData {
   waterLevel: number;
   riskLevel: 'Low' | 'Medium' | 'High';
   resources: string[];
+  coordinates: [number, number];
 }
 
 export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
   const [clickData, setClickData] = useState<MapClickData | null>(null);
   const [timelineValue, setTimelineValue] = useState(12);
+  const [mapboxToken, setMapboxToken] = useState('');
+  const [mapInitialized, setMapInitialized] = useState(false);
+  const [tokenError, setTokenError] = useState(false);
 
-  const handleMapClick = (event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    // Mock data based on click position
-    const mockData: MapClickData = {
-      x,
-      y,
-      zone: `Zone ${Math.floor(Math.random() * 5) + 1}`,
-      waterLevel: Math.floor(Math.random() * 100),
-      riskLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as 'Low' | 'Medium' | 'High',
-      resources: ['Emergency Shelter (2.3km)', 'Fire Station (1.8km)', 'Hospital (4.5km)']
+  // Initialize map when token is provided
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken || mapInitialized) return;
+
+    try {
+      mapboxgl.accessToken = mapboxToken;
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: [-95.3698, 29.7604], // Houston, TX (flood-prone area)
+        zoom: 10,
+        pitch: 0,
+      });
+
+      // Add navigation controls
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      map.current.on('load', () => {
+        if (!map.current) return;
+
+        // Add flood zones layer
+        map.current.addSource('flood-zones', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [-95.4, 29.8],
+                      [-95.3, 29.8],
+                      [-95.3, 29.7],
+                      [-95.4, 29.7],
+                      [-95.4, 29.8]
+                    ]
+                  ]
+                },
+                properties: { risk: 'high', name: 'Zone 1' }
+              },
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [-95.35, 29.75],
+                      [-95.25, 29.75],
+                      [-95.25, 29.65],
+                      [-95.35, 29.65],
+                      [-95.35, 29.75]
+                    ]
+                  ]
+                },
+                properties: { risk: 'medium', name: 'Zone 2' }
+              }
+            ]
+          }
+        });
+
+        map.current.addLayer({
+          id: 'flood-zones-fill',
+          type: 'fill',
+          source: 'flood-zones',
+          paint: {
+            'fill-color': [
+              'match',
+              ['get', 'risk'],
+              'high', '#ef4444',
+              'medium', '#f59e0b',
+              'low', '#22c55e',
+              '#3b82f6'
+            ],
+            'fill-opacity': 0.4
+          }
+        });
+
+        // Add sensors
+        map.current.addSource('sensors', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [-95.37, 29.76] },
+                properties: { status: 'normal', id: 1 }
+              },
+              {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [-95.33, 29.74] },
+                properties: { status: 'warning', id: 2 }
+              },
+              {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [-95.35, 29.72] },
+                properties: { status: 'alert', id: 3 }
+              }
+            ]
+          }
+        });
+
+        map.current.addLayer({
+          id: 'sensors',
+          type: 'circle',
+          source: 'sensors',
+          paint: {
+            'circle-color': [
+              'match',
+              ['get', 'status'],
+              'normal', '#22c55e',
+              'warning', '#f59e0b',
+              'alert', '#ef4444',
+              '#3b82f6'
+            ],
+            'circle-radius': 8,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff'
+          }
+        });
+
+        setMapInitialized(true);
+      });
+
+      // Handle map clicks
+      map.current.on('click', (e) => {
+        const { lng, lat } = e.lngLat;
+        
+        const mockData: MapClickData = {
+          x: e.point.x,
+          y: e.point.y,
+          coordinates: [lng, lat],
+          zone: `Zone ${Math.floor(Math.random() * 5) + 1}`,
+          waterLevel: Math.floor(Math.random() * 100),
+          riskLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as 'Low' | 'Medium' | 'High',
+          resources: ['Emergency Shelter (2.3km)', 'Fire Station (1.8km)', 'Hospital (4.5km)']
+        };
+        
+        setClickData(mockData);
+      });
+
+      setTokenError(false);
+    } catch (error) {
+      console.error('Mapbox initialization error:', error);
+      setTokenError(true);
+    }
+
+    return () => {
+      map.current?.remove();
+      setMapInitialized(false);
     };
-    
-    setClickData(mockData);
-  };
+  }, [mapboxToken]);
+
+  // Update layer visibility based on selectedLayer
+  useEffect(() => {
+    if (!map.current || !mapInitialized) return;
+
+    const layerVisibility = {
+      'flood-zones-fill': selectedLayer === 'flood-zones',
+      'sensors': selectedLayer === 'sensors' || selectedLayer === 'flood-zones'
+    };
+
+    Object.entries(layerVisibility).forEach(([layerId, visible]) => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+      }
+    });
+  }, [selectedLayer, mapInitialized]);
 
   const getRiskColor = (level: string) => {
     switch (level) {
@@ -50,76 +214,62 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
     }
   };
 
-  return (
-    <div className="relative w-full h-full bg-gradient-to-br from-blue-100 via-blue-50 to-green-100 min-h-[600px]">
-      {/* Map Container with visible grid and geographic features */}
-      <div 
-        className="absolute inset-0 cursor-crosshair bg-cover bg-center"
-        onClick={handleMapClick}
-        style={{
-          backgroundImage: `
-            linear-gradient(45deg, rgba(59, 130, 246, 0.1) 25%, transparent 25%), 
-            linear-gradient(-45deg, rgba(59, 130, 246, 0.1) 25%, transparent 25%), 
-            linear-gradient(45deg, transparent 75%, rgba(34, 197, 94, 0.1) 75%), 
-            linear-gradient(-45deg, transparent 75%, rgba(34, 197, 94, 0.1) 75%),
-            radial-gradient(circle at 30% 40%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 70% 60%, rgba(34, 197, 94, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 50% 80%, rgba(239, 68, 68, 0.5) 0%, transparent 30%)
-          `,
-          backgroundSize: '20px 20px, 20px 20px, 20px 20px, 20px 20px, 200px 200px, 200px 200px, 150px 150px'
-        }}
-      >
-        {/* Map Grid Overlay */}
-        <div className="absolute inset-0 opacity-20">
-          <svg width="100%" height="100%" className="absolute inset-0">
-            <defs>
-              <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#3B82F6" strokeWidth="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-
-        {/* Map Overlay Indicators */}
-        <div className="absolute top-4 left-4 space-y-2 z-10">
-          {selectedLayer === 'flood-zones' && (
-            <Badge className="bg-blue-500/90 text-white shadow-lg">📍 Flood Zones Active</Badge>
-          )}
-          {selectedLayer === 'rain-intensity' && (
-            <Badge className="bg-green-500/90 text-white shadow-lg">🌧️ Rain Intensity Active</Badge>
-          )}
-          {selectedLayer === 'sensors' && (
-            <Badge className="bg-purple-500/90 text-white shadow-lg">📡 Sensors Active</Badge>
-          )}
-        </div>
-
-        {/* Mock Geographic Features */}
-        <div className="absolute top-1/4 left-1/6 w-32 h-2 bg-blue-400 rounded-full opacity-60" title="River" />
-        <div className="absolute top-1/3 right-1/4 w-24 h-24 bg-green-300 rounded-full opacity-40" title="Park Area" />
-        <div className="absolute bottom-1/3 left-1/3 w-40 h-4 bg-gray-400 rounded opacity-50" title="Highway" />
-
-        {/* Mock Sensor Points */}
-        <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-green-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold" title="Sensor: Normal">✓</div>
-        <div className="absolute top-1/2 right-1/3 w-4 h-4 bg-yellow-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold" title="Sensor: Warning">⚠</div>
-        <div className="absolute bottom-1/3 left-1/2 w-4 h-4 bg-red-500 rounded-full animate-pulse cursor-pointer border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold" title="Sensor: Alert">!</div>
-
-        {/* Mock Community Reports */}
-        <div className="absolute top-2/3 left-1/3 cursor-pointer" title="Community Report">
-          <div className="relative">
-            <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm border-2 border-white shadow-lg">
-              📍
+  if (!mapboxToken) {
+    return (
+      <div className="relative w-full h-full bg-gradient-to-br from-blue-100 via-blue-50 to-green-100 min-h-[600px] flex items-center justify-center">
+        <Card className="w-96 p-6 bg-white/95 backdrop-blur-sm shadow-xl">
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Key className="w-5 h-5 text-blue-500" />
+              <h3 className="text-lg font-semibold">Mapbox Token Required</h3>
             </div>
-            <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs animate-bounce">!</Badge>
+            <p className="text-sm text-gray-600">
+              To display the real map, please enter your Mapbox public token. 
+              Get yours at <a href="https://mapbox.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">mapbox.com</a>
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="mapbox-token">Mapbox Public Token</Label>
+              <Input
+                id="mapbox-token"
+                type="text"
+                placeholder="pk.ey..."
+                value={mapboxToken}
+                onChange={(e) => setMapboxToken(e.target.value)}
+                className={tokenError ? 'border-red-500' : ''}
+              />
+              {tokenError && (
+                <p className="text-sm text-red-500">Invalid token. Please check your Mapbox token.</p>
+              )}
+            </div>
+            <Button 
+              onClick={() => setMapboxToken(mapboxToken)}
+              className="w-full"
+              disabled={!mapboxToken.startsWith('pk.')}
+            >
+              Initialize Map
+            </Button>
           </div>
-        </div>
+        </Card>
+      </div>
+    );
+  }
 
-        {/* Mock Drone Feed Indicator */}
-        <div className="absolute top-1/4 right-1/4 cursor-pointer" title="Drone Feed">
-          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white border-2 border-white shadow-lg hover:bg-blue-700 transition-colors">
-            <Camera className="w-6 h-6" />
-          </div>
-        </div>
+  return (
+    <div className="relative w-full h-full min-h-[600px]">
+      {/* Map Container */}
+      <div ref={mapContainer} className="absolute inset-0" />
+
+      {/* Map Overlay Indicators */}
+      <div className="absolute top-4 left-4 space-y-2 z-10">
+        {selectedLayer === 'flood-zones' && (
+          <Badge className="bg-blue-500/90 text-white shadow-lg">📍 Flood Zones Active</Badge>
+        )}
+        {selectedLayer === 'rain-intensity' && (
+          <Badge className="bg-green-500/90 text-white shadow-lg">🌧️ Rain Intensity Active</Badge>
+        )}
+        {selectedLayer === 'sensors' && (
+          <Badge className="bg-purple-500/90 text-white shadow-lg">📡 Sensors Active</Badge>
+        )}
       </div>
 
       {/* Zone Details Popup */}
@@ -146,6 +296,10 @@ export const Map: React.FC<MapProps> = ({ selectedLayer, emergencyMode }) => {
           </div>
           
           <div className="space-y-3">
+            <div className="text-xs text-gray-500">
+              Coordinates: {clickData.coordinates[1].toFixed(4)}, {clickData.coordinates[0].toFixed(4)}
+            </div>
+            
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-gray-600">Water Level</span>
